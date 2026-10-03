@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0 --port 62010",
     "build": "vue-tsc --noEmit && vite build",
-    "preview": "vite preview --host 0.0.0.0 --port 62010"
+    "preview": "vite preview --host 0.0.0.0 --port 62010",
+    "test": "vitest run --environment jsdom"
   },
   "dependencies": {
     "@vee-validate/zod": "^4.15.1",
@@ -23,8 +24,10 @@
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^6.0.1",
+    "jsdom": "^29.1.1",
     "typescript": "~5.9.2",
     "vite": "^7.1.7",
+    "vitest": "^4.1.11",
     "vue-tsc": "^3.0.7"
   }
 }

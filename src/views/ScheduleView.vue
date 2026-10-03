@@ -10,6 +10,7 @@ import type { Scene, SceneStatus } from "../types";
 const store = useScheduleStore();
 const saving = ref(false);
 const dragging = ref<number | null>(null);
+const editingId = ref<string | null>(null);
 const form = reactive({ code: "", title: "", day: "2026-10-08", start: "08:00", end: "10:00", locationId: "l1", talentIds: [] as string[], equipmentIds: [] as string[] });
 const schema = toTypedSchema(z.object({
   code: z.string().min(2, "请输入场次编号"),
@@ -23,15 +24,46 @@ const { errors, validate } = useForm({ validationSchema: schema });
 const editable = computed(() => store.role === "制片" || store.role === "导演");
 const currentStatus = (status: string) => status as SceneStatus;
 
+function resetForm() {
+  Object.assign(form, { code: "", title: "", day: "2026-10-08", start: "08:00", end: "10:00", locationId: "l1", talentIds: [], equipmentIds: [] });
+}
+
 onMounted(() => store.loadDraft());
 
 async function submit() {
   const result = await validate({ values: form } as any);
   if (!result.valid) return;
   saving.value = true;
-  store.addScene({ code: form.code, title: form.title, day: form.day, start: form.start, end: form.end, locationId: form.locationId, talentIds: [...form.talentIds], equipmentIds: [...form.equipmentIds] });
-  Object.assign(form, { code: "", title: "", day: "2026-10-08", start: "08:00", end: "10:00", locationId: "l1", talentIds: [], equipmentIds: [] });
+  const payload = { code: form.code, title: form.title, day: form.day, start: form.start, end: form.end, locationId: form.locationId, talentIds: [...form.talentIds], equipmentIds: [...form.equipmentIds] };
+  if (editingId.value) {
+    store.updateScene(editingId.value, payload);
+    editingId.value = null;
+  } else {
+    store.addScene(payload);
+  }
+  resetForm();
   setTimeout(() => { saving.value = false; }, 240);
+}
+
+function startEdit(scene: Scene) {
+  if (!editable.value || scene.locked) return;
+  editingId.value = scene.id;
+  Object.assign(form, {
+    code: scene.code,
+    title: scene.title,
+    day: scene.day,
+    start: scene.start,
+    end: scene.end,
+    locationId: scene.locationId,
+    talentIds: [...scene.talentIds],
+    equipmentIds: [...scene.equipmentIds]
+  });
+  window.scrollTo({ top: 0, behavior: "smooth" });
+}
+
+function cancelEdit() {
+  editingId.value = null;
+  resetForm();
 }
 
 function drop(index: number) {
@@ -54,7 +86,11 @@ function drop(index: number) {
     </div>
     <div class="grid-2">
       <section class="panel">
-        <div class="panel-head"><h2>新增场次</h2><button class="secondary" @click="store.saveDraft">保存离线草稿</button></div>
+        <div class="panel-head">
+          <h2>{{ editingId ? "编辑场次（相关豁免将立即失效重算）" : "新增场次" }}</h2>
+          <button v-if="editingId" class="secondary" @click="cancelEdit">取消编辑</button>
+          <button v-else class="secondary" @click="store.saveDraft">保存离线草稿</button>
+        </div>
         <form class="form-grid" @submit.prevent="submit">
           <label class="field"><span>场次编号</span><input v-model="form.code" placeholder="C-018" /><small>{{ errors.code }}</small></label>
           <label class="field"><span>场次名称</span><input v-model="form.title" placeholder="例如：雨夜追踪" /><small>{{ errors.title }}</small></label>
@@ -64,18 +100,19 @@ function drop(index: number) {
           <label class="field"><span>结束</span><input v-model="form.end" type="time" /></label>
           <label class="field wide"><span>演员档期</span><select v-model="form.talentIds" multiple><option v-for="item in store.talents" :key="item.id" :value="item.id">{{ item.name }} · {{ item.role }}</option></select></label>
           <label class="field wide"><span>器材借用</span><select v-model="form.equipmentIds" multiple><option v-for="item in store.equipment" :key="item.id" :value="item.id">{{ item.name }}</option></select></label>
-          <div class="actions wide"><button class="primary" :disabled="saving || !editable">保存为草稿</button><RouterLink class="secondary" to="/conflicts">检查冲突</RouterLink></div>
+          <div class="actions wide"><button class="primary" :disabled="saving || !editable">{{ editingId ? "保存修改" : "保存为草稿" }}</button><RouterLink class="secondary" to="/conflicts">检查冲突</RouterLink></div>
         </form>
       </section>
       <section class="panel">
-        <div class="panel-head"><div><h2>当日通告顺序</h2><small class="muted">拖拽调整拍摄顺序，版本快照后可随时恢复</small></div><button class="primary" :disabled="!editable" @click="store.snapshot()">保存版本</button></div>
+        <div class="panel-head"><div><h2>当日通告顺序</h2><small class="muted">拖拽调整拍摄顺序；改时间、演员、场地或器材后，旧豁免立即失效</small></div><button class="primary" :disabled="!editable" @click="store.snapshot()">保存版本</button></div>
         <div class="scene-list">
           <article v-for="(scene,index) in store.sortedScenes" :key="scene.id" class="scene" :class="{ locked: scene.locked, dragging: dragging === index }" draggable="true" @dragstart="dragging=index" @dragover.prevent @drop="drop(index)">
             <b>{{ index + 1 }}</b>
             <div class="scene-code">{{ scene.code }}</div>
-            <div class="scene-title"><b>{{ scene.title }}</b><small>{{ scene.start }}–{{ scene.end }} · {{ store.locationName(scene.locationId) }}</small></div>
+            <div class="scene-title"><b>{{ scene.title }}</b><small>{{ scene.day }} {{ scene.start }}–{{ scene.end }} · {{ store.locationName(scene.locationId) }}</small></div>
             <span class="status" :class="scene.status">{{ scene.status }}</span>
             <div class="actions">
+              <button class="secondary" :disabled="!editable || scene.locked" @click="startEdit(scene)">编辑</button>
               <button class="secondary" :disabled="!editable || scene.locked" @click="store.updateStatus(scene.id, currentStatus(scene.status === '草稿' ? '已确认' : scene.status === '已确认' ? '拍摄中' : scene.status === '拍摄中' ? '已完成' : '已完成'))">推进</button>
               <button class="secondary" :disabled="!editable" @click="store.toggleLock(scene.id)">{{ scene.locked ? "解锁" : "锁定" }}</button>
             </div>
