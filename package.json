@@ -1,0 +1,30 @@
+{
+  "name": "pair-wise-yf-45",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 0.0.0.0 --port 62010",
+    "build": "vue-tsc --noEmit && vite build",
+    "preview": "vite preview --host 0.0.0.0 --port 62010"
+  },
+  "dependencies": {
+    "@vee-validate/zod": "^4.15.1",
+    "@vueuse/core": "^13.9.0",
+    "axios": "^1.12.2",
+    "dayjs": "^1.11.18",
+    "element-plus": "^2.11.4",
+    "pinia": "^3.0.3",
+    "vee-validate": "^4.15.1",
+    "vue": "^3.5.22",
+    "vue-i18n": "^11.1.12",
+    "vue-router": "^4.5.1",
+    "zod": "^3.25.76"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^6.0.1",
+    "typescript": "~5.9.2",
+    "vite": "^7.1.7",
+    "vue-tsc": "^3.0.7"
+  }
+}
